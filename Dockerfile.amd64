@@ -1,11 +1,10 @@
-# Built with arch: amd64 flavor: lxqt image: ubuntu:20.04
+# Built with arch: amd64 flavor: lxqt image: ubuntu:focal
 #
 ################################################################################
 # base system
 ################################################################################
 
-FROM ubuntu:20.04 as system
-
+FROM ubuntu:focal as system
 
 
 RUN sed -i 's#http://archive.ubuntu.com/ubuntu/#mirror://mirrors.ubuntu.com/mirrors.txt#' /etc/apt/sources.list;
@@ -36,14 +35,14 @@ RUN apt update \
 RUN apt update \
     && apt install -y gpg-agent \
     && curl -LO https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
-    && (dpkg -i ./google-chrome-stable_current_amd64.deb || apt-get install -fy) \
+    && (dpkg -i ./google-chrome-stable_current_amd64.deb || apt install -fy) \
     && curl -sSL https://dl.google.com/linux/linux_signing_key.pub | apt-key add \
     && rm google-chrome-stable_current_amd64.deb \
     && rm -rf /var/lib/apt/lists/*
 
 RUN apt update \
     && apt install -y --no-install-recommends --allow-unauthenticated \
-        lxqt openbox lxqt-themes \
+        lxqt-powermanagement lxqt openbox lxqt-themes \
     && apt autoclean -y \
     && apt autoremove -y \
     && rm -rf /var/lib/apt/lists/*
@@ -52,7 +51,7 @@ RUN apt update \
 # libreoffice  pinta language-pack-zh-hant language-pack-gnome-zh-hant firefox-locale-zh-hant libreoffice-l10n-zh-tw
 
 # tini to fix subreap
-ARG TINI_VERSION=v0.18.0
+ARG TINI_VERSION=v0.19.0
 ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-amd64 /bin/tini
 RUN chmod +x /bin/tini
 
@@ -66,17 +65,24 @@ RUN apt update \
 
 # python library
 COPY rootfs/usr/local/lib/web/backend/requirements.txt /tmp/
-RUN apt-get update \
+RUN apt update \
     && dpkg-query -W -f='${Package}\n' > /tmp/a.txt \
-    && apt-get install -y python3-pip python3-dev build-essential \
+    && apt install -y python3-pip python3-dev build-essential libc6-dev libpython3-dev \
 	&& pip3 install setuptools wheel && pip3 install -r /tmp/requirements.txt \
     && ln -s /usr/bin/python3 /usr/local/bin/python \
     && dpkg-query -W -f='${Package}\n' > /tmp/b.txt \
-    && apt-get remove -y `diff --changed-group-format='%>' --unchanged-group-format='' /tmp/a.txt /tmp/b.txt | xargs` \
-    && apt-get autoclean -y \
-    && apt-get autoremove -y \
+    && apt remove -y `diff --changed-group-format='%>' --unchanged-group-format='' /tmp/a.txt /tmp/b.txt | xargs` \
+    && apt autoclean -y \
+    && apt autoremove -y \
     && rm -rf /var/lib/apt/lists/* \
     && rm -rf /var/cache/apt/* /tmp/a.txt /tmp/b.txt
+
+RUN apt update \
+    && apt install -y --no-install-recommends \
+        iputils-ping ssh pwgen dirmngr gnupg2 gpg-agent\
+    && apt autoclean -y \
+    && apt autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN cp -R /usr/share/icons/ubuntu-mono-light/* /usr/share/icons/hicolor/
 
@@ -84,24 +90,24 @@ RUN cp -R /usr/share/icons/ubuntu-mono-light/* /usr/share/icons/hicolor/
 ################################################################################
 # builder
 ################################################################################
-FROM ubuntu:20.04 as builder
+FROM ubuntu:focal as builder
 
 
 RUN sed -i 's#http://archive.ubuntu.com/ubuntu/#mirror://mirrors.ubuntu.com/mirrors.txt#' /etc/apt/sources.list;
 
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl ca-certificates gnupg patch
+RUN apt update \
+    && apt install -y --no-install-recommends curl ca-certificates gnupg patch
 
 # nodejs
-RUN curl -sL https://deb.nodesource.com/setup_12.x | bash - \
-    && apt-get install -y nodejs
+RUN curl -sL https://deb.nodesource.com/setup_14.x | bash - \
+    && apt install -y nodejs
 
 # yarn
 RUN curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - \
     && echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list \
-    && apt-get update \
-    && apt-get install -y yarn
+    && apt update \
+    && apt install -y yarn
 
 # build frontend
 COPY web /src/web
@@ -118,11 +124,13 @@ RUN sed -i 's#app/locale/#novnc/app/locale/#' /src/web/dist/static/novnc/app/ui.
 FROM system
 LABEL maintainer="fcwu.tw@gmail.com"
 
+COPY --from=ubuntu:focal /etc/apt/sources.list /etc/apt/sources.list
 COPY --from=builder /src/web/dist/ /usr/local/lib/web/frontend/
 COPY rootfs /
 RUN ln -sf /usr/local/lib/web/frontend/static/websockify /usr/local/lib/web/frontend/static/novnc/utils/websockify && \
 	chmod +x /usr/local/lib/web/frontend/static/websockify/run
 
+EXPOSE 22
 EXPOSE 80
 WORKDIR /root
 ENV HOME=/root \

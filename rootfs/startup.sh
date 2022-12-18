@@ -21,20 +21,25 @@ if [ -n "$RESOLUTION" ]; then
 fi
 
 USER=${USER:-root}
+if [ -z "$PASSWORD" ]; then
+    PASSWORD=`pwgen -c -n -1 12`
+fi
 HOME=/root
 if [ "$USER" != "root" ]; then
     echo "* enable custom user: $USER"
     useradd --create-home --shell /bin/bash --user-group --groups adm,sudo $USER
-    if [ -z "$PASSWORD" ]; then
-        echo "  set default password to \"ubuntu\""
-        PASSWORD=ubuntu
-    fi
     HOME=/home/$USER
-    echo "$USER:$PASSWORD" | chpasswd
     cp -r /root/{.config,.gtkrc-2.0,.asoundrc} ${HOME}
     chown -R $USER:$USER ${HOME}
     [ -d "/dev/snd" ] && chgrp -R adm /dev/snd
 fi
+echo "$USER:$PASSWORD" | chpasswd
+
+# sshd configure
+mkdir -p /var/run/sshd
+sed -i '/PermitRootLogin/c PermitRootLogin yes' /etc/ssh/sshd_config
+echo "ssh login with [$USER:$PASSWORD]"
+
 sed -i -e "s|%USER%|$USER|" -e "s|%HOME%|$HOME|" /etc/supervisor/conf.d/supervisord.conf
 
 # home folder

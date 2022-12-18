@@ -1,10 +1,10 @@
 .PHONY: build run
 
 # Default values for variables
-REPO  ?= dorowu/ubuntu-desktop-lxde-vnc
-TAG   ?= latest
+REPO  ?= skb666/ubuntu-desktop-lxde-vnc
+TAG   ?= focal
 # you can choose other base image versions
-IMAGE ?= ubuntu:20.04
+IMAGE ?= ubuntu:focal
 # choose from supported flavors (see available ones in ./flavors/*.yml)
 FLAVOR ?= lxqt
 # armhf or amd64
