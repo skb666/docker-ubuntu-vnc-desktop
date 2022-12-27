@@ -7,6 +7,8 @@ on:
   pull_request:
     branches:
       - 'focal'
+  schedule:
+    - cron: "0 2 1 * *"
 
 jobs:
   docker:
